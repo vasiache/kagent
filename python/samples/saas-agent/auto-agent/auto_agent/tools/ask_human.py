@@ -3,14 +3,22 @@
 Pauses the graph and waits for human input.
 Use before ANY create / update / delete action.
 
-How it works:
+Flow:
 1. Agent calls ask_human(question, options)
-2. LangGraph interrupt() suspends the graph — state is checkpointed
-3. TG Bot receives the interrupt payload → sends inline keyboard to user
-4. User taps button → TG Bot calls agent.resume(answer)
-5. Graph continues with the human's answer
+2. interrupt() fires with kagent action_requests payload
+3. kagent executor emits input_required + adk_request_confirmation DataPart
+4. User approves/rejects via TG Bot or kagent UI
+5. Graph resumes with the answer
+
+Interrupt payload:
+  {"action_requests": [{"name": "ask_human", "args": {question, options}, "id": "<uuid>"}]}
+
+Resume value:
+  {"decision_type": "approve"|"reject", "ask_user_answers": [{"answer": ["<text>"]}]}
 """
 from __future__ import annotations
+
+import uuid
 
 from langchain_core.tools import tool
 from langgraph.types import interrupt
@@ -21,18 +29,43 @@ def ask_human(question: str, options: list[str] | None = None) -> str:
     """Ask the user a question and wait for their answer before continuing.
 
     ALWAYS call this before any action that creates, updates, or deletes data.
-    The conversation will pause until the user responds.
 
     Args:
-        question: clear description of what you are about to do and why
-        options:  list of suggested responses (e.g. ["Да", "Нет"]).
-                  If None, user can type a free-form answer.
-    """
-    payload: dict = {"question": question}
-    if options:
-        payload["options"] = options
+        question: what you are about to do and why
+        options:  suggested responses (e.g. ["Да", "Нет"]). None = free-form.
 
-    # interrupt() suspends the LangGraph graph execution.
-    # The return value here is what the human typed / selected.
-    answer = interrupt(payload)
-    return str(answer)
+    Returns:
+        The human's answer, or "rejected" if the user denied.
+    """
+    # kagent executor requires action_requests format to emit input_required.
+    payload = {
+        "action_requests": [
+            {
+                "name": "ask_human",
+                "args": {"question": question, "options": options or []},
+                "id": str(uuid.uuid4()),
+            }
+        ]
+    }
+
+    resume_value = interrupt(payload)
+
+    if isinstance(resume_value, dict):
+        decision = resume_value.get("decision_type", "approve")
+
+        if decision == "reject":
+            reasons = resume_value.get("rejection_reasons", {})
+            reason = reasons.get("*", "") if isinstance(reasons, dict) else ""
+            return f"rejected: {reason}" if reason else "rejected"
+
+        # approve — extract text from ask_user_answers[0]["answer"][0]
+        answers = resume_value.get("ask_user_answers", [])
+        if answers and isinstance(answers, list):
+            first = answers[0]
+            if isinstance(first, dict):
+                answer_list = first.get("answer", [])
+                if answer_list and isinstance(answer_list, list):
+                    return str(answer_list[0])
+
+    # resume_value is a plain string (e.g. in tests)
+    return str(resume_value)
