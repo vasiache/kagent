@@ -11,7 +11,25 @@ export async function POST(
     const a2aRequest = await request.json();
 
     const backendUrl = getBackendUrl();
-    const targetUrl = `${backendUrl}/a2a/${namespace}/${agentName}/`;
+    // S-ID ID.3(d): the controller A2A proxy drops client-supplied headers
+    // (trpc-a2a-go only takes headers from RequestOption), so per-user identity
+    // cannot traverse it. When A2A_DIRECT_URL_TEMPLATE is set, call the agent
+    // pod's A2A server directly (same pattern as the tg-bot's AGENT_A2A_URL):
+    //   http://{agentName}.{namespace}.svc.cluster.local:8080/
+    const directTemplate = process.env.A2A_DIRECT_URL_TEMPLATE;
+    const targetUrl = directTemplate
+      ? directTemplate.replace(/\{namespace\}/g, namespace).replace(/\{agentName\}/g, agentName)
+      : `${backendUrl}/a2a/${namespace}/${agentName}/`;
+
+    // S-ID ID.3(d): forward the SSO identity to the agent as X-SaaS-Token.
+    // oauth2-proxy (--pass-authorization-header) places the user's Keycloak
+    // access token in the Authorization header; never trust client-supplied
+    // identity headers — only the Authorization value set by the auth proxy.
+    // Value must be the RAW JWT (no "Bearer " prefix) — same as the tg-bot.
+    const authHeader = request.headers.get('authorization');
+    const saasToken = authHeader?.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : authHeader;
 
     const backendResponse = await fetch(targetUrl, {
       method: 'POST',
@@ -21,6 +39,7 @@ export async function POST(
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
         'User-Agent': 'kagent-ui',
+        ...(saasToken ? { 'X-SaaS-Token': saasToken } : {}),
       },
       body: JSON.stringify(a2aRequest),
     });
@@ -37,6 +56,22 @@ export async function POST(
 
     if (!backendResponse.body) {
       return new Response('Backend response body is null', { status: 500 });
+    }
+
+    // Direct agent A2A servers answer message/send with plain JSON-RPC (the
+    // controller wraps the same call in SSE). Pass JSON through untouched —
+    // the SSE pump below only flushes on \n\n event boundaries and would
+    // swallow a single-line JSON body.
+    const backendCt = backendResponse.headers.get('content-type') || '';
+    if (backendCt.includes('application/json')) {
+      const jsonText = await backendResponse.text();
+      return new Response(jsonText, {
+        status: backendResponse.status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
     }
 
     // Stream the response back to the frontend
