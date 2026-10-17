@@ -19,6 +19,22 @@ func NewTasksHandler(base *Base) *TasksHandler {
 	return &TasksHandler{Base: base}
 }
 
+// HandleListTasks returns all tasks, most recently updated first (long-running
+// phase 1: the global list behind the task watchdog and status dashboards).
+func (h *TasksHandler) HandleListTasks(w ErrorResponseWriter, r *http.Request) {
+	log := ctrllog.FromContext(r.Context()).WithName("tasks-handler").WithValues("operation", "list-tasks")
+
+	tasks, err := h.DatabaseService.ListTasks(r.Context())
+	if err != nil {
+		w.RespondWithError(errors.NewInternalServerError("Failed to list tasks", err))
+		return
+	}
+
+	log.Info("Successfully listed tasks", "count", len(tasks))
+	data := api.NewResponse(tasks, "Successfully listed tasks", false)
+	RespondWithJSON(w, http.StatusOK, data)
+}
+
 func (h *TasksHandler) HandleGetTask(w ErrorResponseWriter, r *http.Request) {
 	log := ctrllog.FromContext(r.Context()).WithName("tasks-handler").WithValues("operation", "get-task")
 

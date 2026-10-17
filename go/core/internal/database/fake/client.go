@@ -302,6 +302,10 @@ func (c *InMemoryFakeClient) ListFeedback(_ context.Context, userID string) ([]d
 	return result, nil
 }
 
+func (c *InMemoryFakeClient) ListTasks(_ context.Context) ([]*protocol.Task, error) {
+	return nil, nil
+}
+
 func (c *InMemoryFakeClient) ListTasksForSession(_ context.Context, sessionID string) ([]*protocol.Task, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

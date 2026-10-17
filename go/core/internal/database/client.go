@@ -161,6 +161,22 @@ func (c *clientImpl) ListTasksForSession(ctx context.Context, sessionID string) 
 	return dbpkg.ParseTasks(tasks)
 }
 
+// ListTasks returns all non-deleted tasks, most recently updated first.
+// Global list (no per-session scoping) — used by the task watchdog and
+// dashboards (long-running phase 1).
+func (c *clientImpl) ListTasks(ctx context.Context) ([]*protocol.Task, error) {
+	var tasks []dbpkg.Task
+	err := c.db.WithContext(ctx).
+		Order("updated_at DESC").
+		Limit(1000).
+		Find(&tasks).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tasks: %w", err)
+	}
+
+	return dbpkg.ParseTasks(tasks)
+}
+
 func (c *clientImpl) ListSessionsForAgent(ctx context.Context, agentID string, userID string) ([]dbpkg.Session, error) {
 	var sessions []dbpkg.Session
 	err := c.db.WithContext(ctx).

@@ -223,6 +223,7 @@ func (s *HTTPServer) setupRoutes() {
 
 	// Tasks
 	s.router.HandleFunc(APIPathTasks+"/{task_id}", adaptHandler(s.handlers.Tasks.HandleGetTask)).Methods(http.MethodGet)
+	s.router.HandleFunc(APIPathTasks, adaptHandler(s.handlers.Tasks.HandleListTasks)).Methods(http.MethodGet)
 	s.router.HandleFunc(APIPathTasks, adaptHandler(s.handlers.Tasks.HandleCreateTask)).Methods(http.MethodPost)
 	s.router.HandleFunc(APIPathTasks+"/{task_id}", adaptHandler(s.handlers.Tasks.HandleDeleteTask)).Methods(http.MethodDelete)
 
