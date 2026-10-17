@@ -198,6 +198,10 @@ class AzureOpenAI(BaseLLM):
 class Anthropic(BaseLLM):
     base_url: str | None = None
 
+    # Request timeout in seconds for the provider HTTP client (mirror of
+    # OpenAI.timeout; without it a hung provider call hangs the task forever).
+    timeout: int | None = None
+
     type: Literal["anthropic"]
 
 
@@ -489,6 +493,7 @@ def _create_llm_from_model_config(model_config: ModelUnion):
             base_url=base_url,
             extra_headers=extra_headers,
             api_key_passthrough=model_config.api_key_passthrough,
+            timeout=model_config.timeout,
         )
     if model_config.type == "gemini_vertex_ai":
         return GeminiLLM(model=model_config.model)

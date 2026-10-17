@@ -579,6 +579,20 @@ func (a *adkApiTranslator) buildManifest(
 							TimeoutSeconds:      probeConf.TimeoutSeconds,
 							PeriodSeconds:       probeConf.PeriodSeconds,
 						},
+						// Without a liveness probe a hung (but running) agent
+						// process is never restarted: readiness only gates
+						// traffic. Same cheap endpoint, deliberately slower
+						// cadence and a start-up grace period so slow model
+						// providers are not mistaken for a dead process.
+						LivenessProbe: &corev1.Probe{
+							ProbeHandler: corev1.ProbeHandler{
+								HTTPGet: &corev1.HTTPGetAction{Path: "/.well-known/agent-card.json", Port: intstr.FromString("http")},
+							},
+							InitialDelaySeconds: probeConf.InitialDelaySeconds + 30,
+							TimeoutSeconds:      10,
+							PeriodSeconds:       30,
+							FailureThreshold:    3,
+						},
 						SecurityContext: securityContext,
 						VolumeMounts:    volumeMounts,
 					}},

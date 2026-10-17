@@ -393,6 +393,12 @@ spec:
                   temperature:
                     description: Temperature for sampling
                     type: string
+                  timeout:
+                    description: |-
+                      Request timeout in seconds for the provider HTTP client. Without it a
+                      hung provider call keeps the agent task hanging forever (there is no
+                      task-level timeout).
+                    type: integer
                   topK:
                     description: Top-k sampling parameter
                     type: integer

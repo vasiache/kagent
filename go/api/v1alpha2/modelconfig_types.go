@@ -111,6 +111,12 @@ type AnthropicConfig struct {
 	// Top-k sampling parameter
 	// +optional
 	TopK int `json:"topK,omitempty"`
+
+	// Request timeout in seconds for the provider HTTP client. Without it a
+	// hung provider call keeps the agent task hanging forever (there is no
+	// task-level timeout).
+	// +optional
+	Timeout int `json:"timeout,omitempty"`
 }
 
 // OpenAIConfig contains OpenAI-specific configuration options

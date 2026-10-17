@@ -199,6 +199,16 @@
                 ],
                 "image": "cr.kagent.dev/kagent-dev/kagent/app:dev",
                 "imagePullPolicy": "IfNotPresent",
+                "livenessProbe": {
+                  "failureThreshold": 3,
+                  "httpGet": {
+                    "path": "/.well-known/agent-card.json",
+                    "port": "http"
+                  },
+                  "initialDelaySeconds": 45,
+                  "periodSeconds": 30,
+                  "timeoutSeconds": 10
+                },
                 "name": "kagent",
                 "ports": [
                   {

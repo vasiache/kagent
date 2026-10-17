@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class KAgentAnthropicLlm(AnthropicLlm):
-    """Anthropic model with api_key_passthrough, custom base_url, and header support."""
+    """Anthropic model with api_key_passthrough, custom base_url, header, and timeout support."""
 
     api_key_passthrough: Optional[bool] = None
 
     _api_key: Optional[str] = None
     base_url: Optional[str] = None
     extra_headers: Optional[dict[str, str]] = None
+    timeout: Optional[int] = None
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -40,4 +41,8 @@ class KAgentAnthropicLlm(AnthropicLlm):
             kwargs["base_url"] = self.base_url
         if self.extra_headers:
             kwargs["default_headers"] = self.extra_headers
+        if self.timeout:
+            # Without a client timeout a hung provider call keeps the agent
+            # task hanging forever (there is no task-level timeout).
+            kwargs["timeout"] = float(self.timeout)
         return AsyncAnthropic(**kwargs)
